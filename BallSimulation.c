@@ -4,22 +4,40 @@
 
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 800
-#define BALL_RADIUS 10
 #define CIRCLE_RADIUS 400
 #define FPS 60
 #define GRAVITY 200.0f
 #define ENERGYKEPT 0.95f
-#define MIN_VELOCITY 5.0f
+#define MIN_VELOCITY 3.0f
+#define NUM_BALLS 500
+#define BALL_RADIUS 5
 
 // Ball properties
 typedef struct {
     float x, y;
     float vx, vy;
 } Ball;
-
-void update_ball(Ball *ball, float dt, Ball balls[], int ballCount) {
+void applyCenterForce(Ball *ball, float dt){
+	
+	float dx = -ball->x;
+	float dy = -ball->y;
+		
+	float dist = sqrt(dx * dx + dy * dy);
+	if(dist > 0){
+				
+		float ax = dx / dist;
+		float ay = dy / dist;
+	
+		ball->vy += 400 * ay * dt;
+		ball->vx += 400 * ax * dt;
+	}
+}
+void update_ball(Ball *ball, float dt, Ball balls[],bool forceOn, int ballCount) {
 	
 	ball->vy += GRAVITY * dt;	
+	if(forceOn){
+		applyCenterForce(ball, dt);
+	}
 	ball->x += ball->vx * dt;
     ball->y += ball->vy * dt;
 
@@ -36,15 +54,15 @@ void update_ball(Ball *ball, float dt, Ball balls[], int ballCount) {
 				ball->x -= colOver * colnx;
 				ball->y -=  colOver * colny;
 					
-				ball->vx -= 1.8 * colDot * colnx;
-				ball->vy -= 1.8 * colDot * colny;
+				ball->vx -= 1.25 * colDot * colnx;
+				ball->vy -= 1.25 * colDot * colny;
 				 // Stop small movements when velocity is too low
-        		//if (fabs(ball->vy) < MIN_VELOCITY) {
-            	//	ball->vy = 0;
-        		//}
-        		//if (fabs(ball->vx) < MIN_VELOCITY) {
-            	//	ball->vx = 0;
-				//}
+        		if (fabs(ball->vy) < MIN_VELOCITY) {
+            		ball->vy = 0;
+        		}
+        		if (fabs(ball->vx) < MIN_VELOCITY) {
+            		ball->vx = 0;
+				}
 			}
 	}
 	
@@ -85,8 +103,29 @@ void draw_circle(SDL_Renderer *renderer, int cx, int cy, int radius) {
     }
 }
 
-void draw_filled_circle(SDL_Renderer *renderer, int cx, int cy, int radius) {
-    SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+float sigmoid_v_to_color(float range,float x){
+	float k = 0.0001;
+	int result = (range/2) * (1 + tanhf(k * x));
+	return result;
+}
+void draw_filled_circle(SDL_Renderer *renderer, int cx, int cy, int radius, Ball *ball) {
+	double speed = sqrt(ball->vx * ball->vx + ball->vy * ball->vy);
+	double Vmax = 200;
+    // Normalize speed to 0-1 range
+    double t = (Vmax > 0) ? speed / Vmax : 0;
+    if (t > 1) t = 1;  // Clamp to max range
+
+    // Interpolate from red (255, 0, 0) to green (0, 255, 0)
+    float r = ((1 - t) * 255);  // Red decreases as speed increases
+    float g = (t * 255);        // Green increases as speed increases
+    float b = 0;                     // Keep blue at 0
+
+    // Ensure values stay in range
+    if (r < 0) r = 0; if (r > 255) r = 255;
+    if (g < 0) g = 0; if (g > 255) g = 255;
+	
+		
+	SDL_SetRenderDrawColor(renderer, r, g, b, 255);
     for (int w = 0; w < radius * 2; w++) {
         for (int h = 0; h < radius * 2; h++) {
             int dx = radius - w;
@@ -107,7 +146,7 @@ void render(SDL_Renderer *renderer, Ball balls[], int ballCount) {
     // Draw ball
 	for(int i = 0; i < ballCount; i++){
 
-    	draw_filled_circle(renderer, WINDOW_WIDTH / 2 + (int)balls[i].x, WINDOW_HEIGHT / 2 + (int)balls[i].y, BALL_RADIUS);
+    	draw_filled_circle(renderer, WINDOW_WIDTH / 2 + (int)balls[i].x, WINDOW_HEIGHT / 2 + (int)balls[i].y, BALL_RADIUS, &balls[i]);
 	}
     SDL_RenderPresent(renderer);
 }
@@ -123,29 +162,41 @@ void instantiateBalls(Ball balls[], int ballCount){
 
 }
 
-int main(void) {
+int main(int argc, char* argv[]) {
     SDL_Init(SDL_INIT_VIDEO);
     SDL_Window *window = SDL_CreateWindow("Bouncing Ball Simulation", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT, 0);
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
 
-    int ballCount = 100;
+    int ballCount = atoi(argv[1]);
 	Ball balls[ballCount]; 
 	instantiateBalls(balls, ballCount);
 
 	bool running = true;
     SDL_Event event;
     Uint32 last_time = SDL_GetTicks();
-
+	
+	bool forceOn = false;
     while (running) {
-        while (SDL_PollEvent(&event)) {
+      
+		   	while (SDL_PollEvent(&event)) {
             if (event.type == SDL_QUIT) running = false;
-	   	}
+	   		if(event.type == SDL_KEYDOWN){
+				 if(event.key.keysym.sym == SDLK_UP){
+					forceOn = true;
+				 }
+			}
+			if(event.type == SDL_KEYUP){
+				if(event.key.keysym.sym == SDLK_UP){
+					forceOn = false;
+				}
+			}
+		}
         
         Uint32 current_time = SDL_GetTicks();
         float dt = (current_time - last_time) / 1000.0f;
         last_time = current_time;
 		for(int i = 0; i < ballCount; i++){
-			update_ball(&balls[i], dt, balls, ballCount);
+			update_ball(&balls[i], dt, balls, forceOn, ballCount);
 		}	
         render(renderer, balls, ballCount);
 		
