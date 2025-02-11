@@ -1,6 +1,11 @@
 #include </opt/homebrew/include/SDL2/SDL.h>
+#include <complex.h>
 #include <math.h>
 #include <stdbool.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
 
 #define WINDOW_WIDTH 800
 #define WINDOW_HEIGHT 800
@@ -9,9 +14,7 @@
 #define GRAVITY 200.0f
 #define ENERGYKEPT 0.95f
 #define MIN_VELOCITY 3.0f
-#define NUM_BALLS 500
-#define BALL_RADIUS 5
-
+#define BALL_RADIUS 15
 // Ball properties
 typedef struct {
     float x, y;
@@ -46,11 +49,11 @@ void update_ball(Ball *ball, float dt, Ball balls[],bool forceOn, int ballCount)
 			float dx = balls[i].x - ball->x;
 			float dy = balls[i].y - ball->y;
 			float colDist = sqrt(dx * dx + dy * dy);	
-			if(colDist < BALL_RADIUS*2){
+			if(colDist < BALL_RADIUS * 2){
 				float colnx = dx / colDist;
 				float colny = dy / colDist;
 				float colDot = ball->vx * colnx + ball->vy * colny;
-				float colOver = 2 * BALL_RADIUS - colDist;
+				float colOver = (2 * BALL_RADIUS) - colDist;
 				ball->x -= colOver * colnx;
 				ball->y -=  colOver * colny;
 					
@@ -152,7 +155,7 @@ void render(SDL_Renderer *renderer, Ball balls[], int ballCount) {
 }
 
 
-void instantiateBalls(Ball balls[], int ballCount){
+void instantiateBalls(Ball balls[], int ballCount, bool randRadius){
 	for(int i = 0; i < ballCount; i++){
 		balls[i].x = -400 + 10 * i;
 		balls[i].y = -CIRCLE_RADIUS / 2;
@@ -166,10 +169,11 @@ int main(int argc, char* argv[]) {
     SDL_Init(SDL_INIT_VIDEO);
     SDL_Window *window = SDL_CreateWindow("Bouncing Ball Simulation", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT, 0);
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-
     int ballCount = atoi(argv[1]);
-	Ball balls[ballCount]; 
-	instantiateBalls(balls, ballCount);
+	bool randRadius = false;
+
+	Ball balls[ballCount];	
+	instantiateBalls(balls, ballCount, randRadius);
 
 	bool running = true;
     SDL_Event event;
