@@ -19,6 +19,7 @@
 typedef struct {
     float x, y;
     float vx, vy;
+	float r;
 } Ball;
 void applyCenterForce(Ball *ball, float dt){
 	
@@ -49,11 +50,11 @@ void update_ball(Ball *ball, float dt, Ball balls[],bool forceOn, int ballCount)
 			float dx = balls[i].x - ball->x;
 			float dy = balls[i].y - ball->y;
 			float colDist = sqrt(dx * dx + dy * dy);	
-			if(colDist < BALL_RADIUS * 2){
+			if(colDist < ball->r + balls[i].r){
 				float colnx = dx / colDist;
 				float colny = dy / colDist;
 				float colDot = ball->vx * colnx + ball->vy * colny;
-				float colOver = (2 * BALL_RADIUS) - colDist;
+				float colOver = (balls[i].r + ball->r) - colDist;
 				ball->x -= colOver * colnx;
 				ball->y -=  colOver * colny;
 					
@@ -70,7 +71,7 @@ void update_ball(Ball *ball, float dt, Ball balls[],bool forceOn, int ballCount)
 	}
 	
     float dist = sqrt(ball->x * ball->x + ball->y * ball->y);
-    if (dist + BALL_RADIUS > CIRCLE_RADIUS) {
+    if (dist + ball->r > CIRCLE_RADIUS) {
         // Normalized normal vector
         float nx = ball->x / dist;
         float ny = ball->y / dist;
@@ -83,7 +84,7 @@ void update_ball(Ball *ball, float dt, Ball balls[],bool forceOn, int ballCount)
 		ball->vy *= ENERGYKEPT;
 		ball->vx *= ENERGYKEPT;
 
-		float overlap = (dist + BALL_RADIUS) - CIRCLE_RADIUS;
+		float overlap = (dist + ball->r) - CIRCLE_RADIUS;
         ball->x -= overlap * nx;
         ball->y -= overlap * ny;
 		
@@ -104,6 +105,7 @@ void draw_circle(SDL_Renderer *renderer, int cx, int cy, int radius) {
         int y = cy + (int)(radius * sin(rad));
         SDL_RenderDrawPoint(renderer, x, y);
     }
+
 }
 
 float sigmoid_v_to_color(float range,float x){
@@ -129,7 +131,8 @@ void draw_filled_circle(SDL_Renderer *renderer, int cx, int cy, int radius, Ball
 	
 		
 	SDL_SetRenderDrawColor(renderer, r, g, b, 255);
-    for (int w = 0; w < radius * 2; w++) {
+    /*
+	for (int w = 0; w < radius * 2; w++) {
         for (int h = 0; h < radius * 2; h++) {
             int dx = radius - w;
             int dy = radius - h;
@@ -138,6 +141,17 @@ void draw_filled_circle(SDL_Renderer *renderer, int cx, int cy, int radius, Ball
             }
         }
     }
+	*/
+	for(int x = cx - radius; x <= cx + radius; x++){
+		for(int y = cy - radius; y <= cy + radius; y++){
+			float dx = x - cx;
+			float dy = y - cy;
+			float dist = sqrt(dx * dx + dy * dy);
+			if(dist <= radius){
+				SDL_RenderDrawPoint(renderer, x, y);
+			}
+		}
+	}
 }
 void render(SDL_Renderer *renderer, Ball balls[], int ballCount) {
  SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);	 
@@ -149,7 +163,7 @@ void render(SDL_Renderer *renderer, Ball balls[], int ballCount) {
     // Draw ball
 	for(int i = 0; i < ballCount; i++){
 
-    	draw_filled_circle(renderer, WINDOW_WIDTH / 2 + (int)balls[i].x, WINDOW_HEIGHT / 2 + (int)balls[i].y, BALL_RADIUS, &balls[i]);
+    	draw_filled_circle(renderer, WINDOW_WIDTH / 2 + (int)balls[i].x, WINDOW_HEIGHT / 2 + (int)balls[i].y, balls[i].r, &balls[i]);
 	}
     SDL_RenderPresent(renderer);
 }
@@ -157,10 +171,15 @@ void render(SDL_Renderer *renderer, Ball balls[], int ballCount) {
 
 void instantiateBalls(Ball balls[], int ballCount, bool randRadius){
 	for(int i = 0; i < ballCount; i++){
+		float num = BALL_RADIUS;
+		if(randRadius){
+			num = (float)(rand() % 11) + 5;	
+		}
 		balls[i].x = -400 + 10 * i;
 		balls[i].y = -CIRCLE_RADIUS / 2;
 	    balls[i].vx = 0;
-		balls[i].vy = 10;	
+		balls[i].vy = 10;
+		balls[i].r = num;	
 	}
 
 }
@@ -169,10 +188,13 @@ int main(int argc, char* argv[]) {
     SDL_Init(SDL_INIT_VIDEO);
     SDL_Window *window = SDL_CreateWindow("Bouncing Ball Simulation", SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED, WINDOW_WIDTH, WINDOW_HEIGHT, 0);
     SDL_Renderer *renderer = SDL_CreateRenderer(window, -1, SDL_RENDERER_ACCELERATED);
-    int ballCount = atoi(argv[1]);
+    
+	int ballCount = atoi(argv[1]);
 	bool randRadius = false;
-
-	Ball balls[ballCount];	
+	if(argc == 3 && strcmp(argv[2], "-r")){
+		randRadius = true;
+	}
+	Ball *balls = malloc(sizeof(Ball) * ballCount);	
 	instantiateBalls(balls, ballCount, randRadius);
 
 	bool running = true;
@@ -210,6 +232,7 @@ int main(int argc, char* argv[]) {
     SDL_DestroyRenderer(renderer);
     SDL_DestroyWindow(window);
     SDL_Quit();
+	free(balls);
     return 0;
 }
 
